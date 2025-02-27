@@ -1,5 +1,5 @@
 CC       := clang
-PKGS     := sdl3
+PKGS     := sdl3 sdl3-ttf
 CFLAGS   := -Wall -O2 $(shell pkg-config --cflags $(PKGS))
 LDFLAGS  := $(shell pkg-config --libs $(PKGS))
 
