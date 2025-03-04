@@ -13,6 +13,7 @@
 #define WIDTH 1000
 #define HEIGHT 800
 #define BUFFER_SIZE 256
+#define PATH_MAX 512
 
 char text_buffer[BUFFER_SIZE] = {0};
 char text_row_buffer[BUFFER_SIZE] = {0};
@@ -47,7 +48,7 @@ bool init() {
     return false;
   }
 
-  font = TTF_OpenFont("fonts/FiraCodeNerdFontMono-Regular.ttf", 36);
+  font = TTF_OpenFont("./fonts/FiraCodeNerdFontMono-Regular.ttf", 36);
   if (font == NULL) {
     SDL_Log("TTF_OpenFont Error: %s\n", SDL_GetError());
     return false;
