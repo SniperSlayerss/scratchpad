@@ -17,7 +17,6 @@
 char text_buffer[BUFFER_SIZE] = {0};
 char text_row_buffer[BUFFER_SIZE] = {0};
 int font_height;
-int y = 0;
 
 SDL_Window *window = NULL;
 SDL_Renderer *renderer = NULL;
@@ -98,9 +97,10 @@ void render_text(const char *raw_text, SDL_Color text_color) {
   while (i < BUFFER_SIZE && i < len + 1) {
     if (text_buffer[i] == '\n' || text_buffer[i] == '\0') {
       text = TTF_CreateText(text_engine, font, text_row_buffer, strlen(text_row_buffer));
-      TTF_DrawRendererText(text, 0, row);
+      TTF_DrawRendererText(text, 0, row * font_height);
       col = 0;
       ++row;
+      ++i;
     }
 
     text_row_buffer[col] = text_buffer[i];
@@ -132,20 +132,10 @@ int main(int argc, char *argv[]) {
 
       if (event.type == SDL_EVENT_KEY_DOWN) {
         switch (event.key.key) {
-        case SDLK_UP:
-          if (y > 0) {
-            y -= 1;
-          }
-          break;
-        case SDLK_DOWN:
-          if (y < HEIGHT / font_height - 1) {
-            y += 1;
-          }
-          break;
         case SDLK_BACKSPACE:
           pop_char();
           break;
-        case SDLK_1:
+        case SDLK_RETURN:
           append_char('\n');
         case SDLK_I:
           SDL_StartTextInput(window);
