@@ -1,27 +1,28 @@
-#include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
-#include <SDL3/SDL_rect.h>
-#include <SDL3/SDL_render.h>
-#include <SDL3/SDL_surface.h>
-#include <SDL3_ttf/SDL_ttf.h>
-
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
+
 #define WIDTH 1000
 #define HEIGHT 800
-#define BUFFER_SIZE 256
-#define PATH_MAX 512
+#define BUFFER_SIZE 1024
 
-char text_buffer[BUFFER_SIZE] = {0};
+typedef struct {
+  size_t cursor_pos;
+  size_t len;
+  char text_buffer[BUFFER_SIZE];
+} FileContext;
+
 char text_row_buffer[BUFFER_SIZE] = {0};
+
 int font_height;
 
-SDL_Window *window = NULL;
-SDL_Renderer *renderer = NULL;
-TTF_Font *font = NULL;
+SDL_Window     *window      = NULL;
+SDL_Renderer   *renderer    = NULL;
+TTF_Font       *font        = NULL;
 TTF_TextEngine *text_engine = NULL;
 
 bool init() {
@@ -59,65 +60,75 @@ bool init() {
     SDL_Log("TTF_CreateSurfaceTextEngine Error: %s\n", SDL_GetError());
     return false;
   }
-
   font_height = TTF_GetFontHeight(font);
+
   return true;
 }
 
-void append_char(char c) {
-  size_t len = strlen(text_buffer);
-  if (len >= BUFFER_SIZE - 1) {
-    return;
-  }
-
-  text_buffer[len] = c;
-  text_buffer[len + 1] = '\0';
+void cleanup() {
+  TTF_CloseFont(font);
+  TTF_Quit();
+  SDL_DestroyRenderer(renderer);
+  SDL_DestroyWindow(window);
+  SDL_Quit();
 }
 
-char pop_char() {
-  size_t len = strlen(text_buffer);
-  if (len == 0) {
+bool context_append_char(FileContext *context, char c) {
+  if (context->len >= BUFFER_SIZE - 1) {
+    return false;
+  }
+
+  context->text_buffer[context->len] = c;
+  context->text_buffer[context->len + 1] = '\0';
+  ++context->len;
+  return true;
+}
+
+char context_pop_char(FileContext *context) {
+  if (context->len == 0) {
     return '\0';
   }
 
-  char c = text_buffer[len - 1];
-  text_buffer[len - 1] = '\0';
+  char c = context->text_buffer[context->len - 1];
+  context->text_buffer[context->len - 1] = '\0';
+  --context->len;
   return c;
 }
 
-void render_text(const char *raw_text, SDL_Color text_color) {
-  size_t len = strlen(raw_text);
-  if (len == 0) {
-    return;
+bool context_render_text(FileContext *context) {
+  if (context->len == 0) {
+    return false;
   }
 
   int i = 0;
   int row = 0;
   int col = 0;
   TTF_Text *text = {};
-  while (i < BUFFER_SIZE && i < len + 1) {
-    if (text_buffer[i] == '\n' || text_buffer[i] == '\0') {
-      text = TTF_CreateText(text_engine, font, text_row_buffer, strlen(text_row_buffer));
+  while (i < BUFFER_SIZE && i < context->len + 1) {
+    if (context->text_buffer[i] == '\n' || context->text_buffer[i] == '\0') {
+      text = TTF_CreateText(text_engine, font, text_row_buffer, col);
       TTF_DrawRendererText(text, 0, row * font_height);
       col = 0;
       ++row;
       ++i;
     }
 
-    text_row_buffer[col] = text_buffer[i];
+    text_row_buffer[col] = context->text_buffer[i];
     text_row_buffer[col+1] = '\0';
     ++col;
     ++i;
   }
 
   TTF_DestroyText(text);
+  return true;
 }
 
 int main(int argc, char *argv[]) {
-
   if (!init()) {
     return 1;
   }
+
+  FileContext context = {0, 0, {0}};
 
   bool done = false;
   while (!done) {
@@ -126,18 +137,18 @@ int main(int argc, char *argv[]) {
       if (event.type == SDL_EVENT_QUIT) {
         done = true;
       }
-
+      // ~~INSERT MODE~~
       if (event.type == SDL_EVENT_TEXT_INPUT) {
-        append_char(event.text.text[0]);
+        context_append_char(&context, event.text.text[0]);
       }
-
+      // ~~NORMAL MODE~~
       if (event.type == SDL_EVENT_KEY_DOWN) {
         switch (event.key.key) {
         case SDLK_BACKSPACE:
-          pop_char();
+          context_pop_char(&context);
           break;
         case SDLK_RETURN:
-          append_char('\n');
+          context_append_char(&context, '\n');
         case SDLK_I:
           SDL_StartTextInput(window);
           break;
@@ -147,21 +158,19 @@ int main(int argc, char *argv[]) {
         }
       }
     }
-
-    // clear window to grey
+    // Background
     SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
     SDL_RenderClear(renderer);
 
-    SDL_Color text_color = {224, 222, 244};
-    render_text(text_buffer, text_color);
+    // Text
+    // TODO: Change text color
+    SDL_Color text_color = {224, 222, 244, 255};
+    context_render_text(&context);
 
+    // Render
     SDL_RenderPresent(renderer);
   }
 
-  TTF_CloseFont(font);
-  TTF_Quit();
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
-  SDL_Quit();
+  cleanup();
   return 0;
 }
